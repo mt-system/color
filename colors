@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+
+# shellcheck source=./colors-256.sh
+# shellcheck source=./colors-16.sh
+source "$(pwd)/colors-256.sh"
+source "$(pwd)/colors-16.sh"
+
+is_256=$([[ $(tput colors) = 256 ]] && echo 1 || echo "")
+
+color() {
+    if [[ $is_256 ]]; then
+        c=$(tput setaf "$1")
+        echo "${c%m}"
+    else
+        echo "\e[${1}"
+    fi
+}
+
+bg_color() {
+    [[ $is_256 ]] && tput setab "$1" || echo ""
+}
+
+[[ $is_256 ]] && end_color="$(tput sgr0)" || end_color="\e[0m"
+
+merge() {
+    local array_styles=$1
+    local styles=""
+
+    for style in "${array_styles[@]}"; do
+        styles="${style};"
+    done
+
+    # remove last ";"
+    echo "${styles%;}"
+}
+
+is_array_empty() {
+    local array=$1
+
+    echo "${array[@]}"
+
+    if ((${#array[@]} == 0)); then
+        echo "oui"
+    else
+        echo "non"
+    fi
+}
+
+print_color() {
+    local text=$1
+    shift
+
+    local style=""
+    declare -a styles_256 # automatically it is local
+    declare -a styles_16
+
+    if [ "$2" == "info" ]; then
+        [[ $is_256 ]] && styles_256+=("$sea_green1_256") || styles_16+=("$turquoise_16")
+        shift
+    elif [ "$2" == "success" ]; then
+        [[ $is_256 ]] && styles_256+=("$spring_green2_256") || styles_16+=("$light_green_16")
+        shift
+    elif [ "$2" == "warning" ]; then
+        [[ $is_256 ]] && styles_256+=("$yellow3_256") || styles_16+=("$yellow_16")
+        shift
+    elif [ "$2" == "danger" ]; then
+        [[ $is_256 ]] && styles_256+=("$red1_256") || styles_16+=("$light_red_16")
+        shift
+    fi
+
+    if (($# > 0)); then
+        local suffix
+        suffix=$([[ $is_256 ]] && echo "_256" || echo "_16")
+
+        for var in "$@"; do
+            eval s='$'"${var}${suffix}"
+            [[ $s && $is_256 ]] && styles_256+=("$s") || styles_16+=("$s")
+
+            if [[ ! $s && "$is_256" ]]; then
+                eval s='$'"${var}_16"
+                styles_16+=("$s")
+            fi
+
+            # style=$([[ $style && $s ]] && echo "${style};${s}" || echo "$s") # if "s" is set => ;$s else null
+        done
+    fi
+
+    # style=${style:-$default_colour} # if $style is empty, use default value
+    is_some_styles=$(! is_array_empty "$styles_16" || ! is_array_empty "$styles_256")
+
+    if [[ $style ]]; then
+        echo "$(color "$style")m%b${end_color}" | \cat -v
+        printf "$(color "$style")m%b${end_color}" "${text}"
+    else
+        echo "$text"
+    fi
+}
+
+get_color() {
+    eval style='$'"${1}" 2>/dev/null
+
+    if [ "$style" ]; then
+        # return start color code / end color code separated with a column ":" to be parsable easily
+        echo "$(color "$style" | \cat -v)m:$($end_color | \cat -v)"
+    fi
+}
+
+get_color_names() {
+    read -r -d '' styles <<EOS
+default_colour=0
+bold=1
+underlined=4
+flashing_text=5
+reverse_field=7
+concealed=8
+black_background=40
+red_background=41
+green_background=42
+orange_background=43
+blue_background=44
+purple_background=45
+cyan_background=46
+grey_background=47
+dark_grey_background=100
+light_red_background=101
+light_green_background=102
+yellow_background=103
+light_blue_background=104
+light_purple_background=105
+turquoise_background=106
+white_background=107
+black=30
+red=31
+green=32
+orange=33
+blue=34
+purple=35
+cyan=36
+grey=37
+dark_grey=90
+light_red=91
+light_green=92
+yellow=93
+light_blue=94
+light_purple=95
+turquoise=96
+white=97
+EOS
+
+    if [ "$1" == "only-names" ]; then
+        for s in $styles; do echo "$s" | cut -d= -f 1; done
+    else
+        echo "$styles"
+    fi
+}
