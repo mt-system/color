@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-// const { table, createStream } = require('table');
 const fixedWidthString = require('fixed-width-string');
 const stringWidth = require('string-width');
 const { colors } = require('./colors.data');
@@ -74,6 +73,10 @@ const displayColumns = (rows, rowMaxLength) => {
 
 const lightGrey = colors[ 256 ].grey.light[ 4 ];
 
+/**
+ *  @param {string} colorKey
+ *  @param {16 | 25} type
+ */
 const contrastBg = (colorKey, type) => {
     const greyBackground = `;${markers[ type ].bg};${lightGrey}`;
 
@@ -92,6 +95,30 @@ const contrastBg = (colorKey, type) => {
 };
 
 
+
+
+/**
+ *  @param {16 | 25} type
+ */
+const getColorsAndStyles = type => {
+    if (type === 16) {
+        return {
+            foreground: objectToKeyValueArray(colors[ 16 ].foreground),
+            background: objectToKeyValueArray(colors[ 16 ].background),
+            styles: objectToKeyValueArray(colors[ 16 ].style)
+        };
+    }
+
+    console.assert(type === 256, 'type is 16 | 256');
+    // throw new Error(`type must be 16 | 256. Here type: "${type}"`);
+
+    return {
+        colors: objectToKeyValueArrayRecursive(colors[ 256 ])
+    };
+};
+
+
+
 /**
  *  @param {16 | 25} type
  *  @param {string} text
@@ -102,35 +129,59 @@ const contrastBg = (colorKey, type) => {
  *      foreground?: string[];
  *      background?: string[];
  *      onlyForeground?: boolean;
- *      onlyBackground?: boolean
+ *      onlyBackground?: boolean;
+ *      raw?: boolean;
  *  }} options
  */
 const displayColors = (type, text, options) => {
 
-    const opts = { allStyles: true, styles: [], mergeStyles: false, ...options };
-
-    const stylesSelected = objectToKeyValueArray(colors[ 16 ].style).filter(s => {
-        return opts.allStyles ||
-            opts.styles.includes(s.key) ||
-            (opts.styles.length === 0 ? s.value === colors[ 16 ].style.defaultColour : false);
-    });
+    const opts = { allStyles: true, styles: [], mergeStyles: false, raw: false, ...options };
 
 
-    const styles = opts.mergeStyles ?
-        [
-            stylesSelected.reduce((m, style, i) => ({
+    if (opts.raw) {
+        for (const [ key, styles ] of Object.entries(getColorsAndStyles(type))) {
+            console.log(`# ${key}`);
+
+            for (const s of styles) {
+                console.log(`${s.key}: ${s.value}`);
+            }
+        }
+
+        return;
+    }
+
+
+    const getStyles = () => {
+        const styles = objectToKeyValueArray(colors[ 16 ].style);
+
+        const stylesSelected = styles.filter(s => {
+            return opts.allStyles ||
+                opts.styles.includes(s.key) ||
+                (opts.styles.length === 0 ? s.value === colors[ 16 ].style.defaultColour : false);
+        });
+
+
+        if (opts.mergeStyles) {
+            const mergeStyles = stylesSelected.reduce((m, style, i) => ({
                 key: `${m.key}${i === 0 ? '' : '.'}${style.key}`,
                 value: `${m.value}${i === 0 ? '' : ';'}${style.value}`
-            }), { key: '', value: '' })
-        ] :
-        stylesSelected;
+            }), { key: '', value: '' });
+
+            return [ mergeStyles ];
+        }
+
+        return stylesSelected;
+    };
+
+    const styles = getStyles();
 
 
     const getColors = () => {
         const hasColor = (colorKeys, color) => !!colorKeys?.find(k => color.key.startsWith(k));
 
-        const filterFg = opts.onlyBackground ? _c => true : opts.foreground ? c => hasColor(opts.foreground, c) : _c => true;
-        const filterBg = opts.onlyForeground ? _c => true : opts.background ? c => hasColor(opts.background, c) : _c => true;
+        const filterAll = _c => true;
+        const filterFg = opts.onlyBackground ? filterAll : opts.foreground ? c => hasColor(opts.foreground, c) : filterAll;
+        const filterBg = opts.onlyForeground ? filterAll : opts.background ? c => hasColor(opts.background, c) : filterAll;
 
         if (type === 16)
             return {
@@ -157,6 +208,7 @@ const displayColors = (type, text, options) => {
 
     for (const fg of foregroundColors) {
         for (const bg of backgroundColors) {
+
             if (bg.key === fg.key)
                 continue;
 
@@ -183,66 +235,37 @@ const displayColors = (type, text, options) => {
 
 
 
+
 /**
  *  @param {16 | 25} type
  */
-const displayColorKeys = type => {
+const displayColorKeys = (type, { raw = false }) => {
 
-    const getStyles = () => {
-        if (type === 16) {
-            /*   console.log('Foreground 🠒 ', Object.keys(colors[ 16 ].foreground));
-              console.log('Background 🠒 ', Object.keys(colors[ 16 ].background));
-              console.log('Styles 🠒 ', Object.keys(colors[ 16 ].style)); */
+    Object.entries(getColorsAndStyles(type)).forEach(([ key, styles ], i) => {
+        if (raw) {
+            console.log(`# ${key}`);
 
-            return {
-                foreground: objectToKeyValueArray(colors[ 16 ].foreground),
-                background: objectToKeyValueArray(colors[ 16 ].background),
-                styles: objectToKeyValueArray(colors[ 16 ].style)
-            };
+            for (const style of styles) {
+                console.log(style.key);
+            }
+
+        } else {
+            let maxKeyLength = 0;
+
+            const rows = styles.map(s => {
+                maxKeyLength = Math.max(maxKeyLength, s.key.length);
+                return raw ? s.key : stylize({ style: `${markers[ type ].fg};${s.value}${contrastBg(s.key, type)}`, text: `${s.key}` });
+            });
+
+            const boldUnderline = `${colors[ 16 ].style.bold};${colors[ 16 ].style.underlined}`;
+            console.log(`${i > 0 ? '\n' : ''}${stylize({ style: boldUnderline, text: key })}:\n`);
+
+            displayColumns(rows, maxKeyLength);
         }
-
-        console.assert(type === 256, 'type is 16 | 256');
-        // throw new Error(`type must be 16 | 256. Here type: "${type}"`);
-
-        return {
-            colors: objectToKeyValueArrayRecursive(colors[ 256 ])
-        };
-    };
-
-
-    Object.entries(getStyles()).forEach(([ key, styles ], i) => {
-        let maxKeyLength = 0;
-
-        const rows = styles.map(c => {
-            maxKeyLength = Math.max(maxKeyLength, c.key.length);
-            return stylize({ style: `${markers[ type ].fg};${c.value}${contrastBg(c.key, type)}`, text: `${c.key}` });
-        });
-
-        const boldUnderline = `${colors[ 16 ].style.bold};${colors[ 16 ].style.underlined}`;
-        console.log(`${i > 0 ? '\n' : ''}${stylize({ style: boldUnderline, text: key })}:\n`);
-
-        displayColumns(rows, maxKeyLength);
     });
-
-
-
-    // console.log('Colors 🠒 ', colors256.map(c => c.key));
-    // colors256.forEach(c => console.log(c.key));
 };
 
 
-
-console.log('\nColors 16\n');
-displayColors(16, 'Text 16', { allStyles: false, styles: [ 'bold',/*  'underlined' */ ], mergeStyles: true, foreground: [ 'darkGrey' ] });
-
-console.log('\nColors 256\n');
-displayColors(256, 'Text 256', { allStyles: false, styles: [ 'bold'/* , 'underlined' */ ], mergeStyles: true, foreground: [ 'grey.medium.default' ] });
-
-console.log('\nColors 16\n');
-displayColorKeys(16);
-
-console.log('\nColors 256\n');
-displayColorKeys(256);
 
 module.exports = {
     displayColors,

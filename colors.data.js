@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+// see https://jonasjacek.github.io/colors/
+// see https://robotmoon.com/256-colors/
+// see https://misc.flogisoft.com/bash/tip_colors_and_formatting
+
 const colors = {
     16: {
         style: {
