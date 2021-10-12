@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
 # shellcheck source=./colors.data.sh
-SCRIPT=$(realpath $0)
-DIRPATH=$(dirname $SCRIPT)
+script=$(realpath -s $0)
+script_name=$(basename $script)
+script_dir=$(dirname $script)
 
-source "$DIRPATH/colors.data.sh"
+source "$script_dir/colors.data.sh"
 
 export is_256=$([[ $(tput colors) = 256 ]] && echo 1 || echo "")
 
@@ -25,10 +26,12 @@ function bg_color() {
 
 function merge_styles() {
     local array_styles=("$@")
-    local styles=""
+    local styles
 
     for style in "${array_styles[@]}"; do
-        styles="${style};"
+        if [[ "$style" ]]; then
+            styles="${styles}${styles+;}${style}"
+        fi
     done
 
     # remove last ";"
@@ -40,8 +43,53 @@ is_array_empty() {
     ((${#array[@]} == 0)) && echo "1" || echo ""
 }
 
-print_color() {
-    local text=$1
+function get_color_code_details() {
+    var=${1//[-\.]/_}
+
+    if [[ $is_256 ]]; then
+        local v=${var//[-_]bg/}
+        local is_bg=$([[ "$var" != "$v" ]] && echo "1" || echo "")
+
+        eval s='$'"${v}${suffix}"
+
+        if [[ $s ]]; then
+            if [[ $is_bg ]]; then
+                echo "256:bg:${s}"
+                return
+            else
+                echo "256:fg:${s}"
+                return
+            fi
+        else
+            # let's try _16 if we are in 256 mode
+            eval s='$'"${var}_16"
+            if [[ $s ]]; then
+                echo "16::${s}"
+                return
+            fi
+        fi
+    else
+        eval s='$'"${var}${suffix}"
+        if [[ $s ]]; then
+            echo "16::${s}"
+            return
+        fi
+    fi
+}
+
+function push() {
+    local -n arr=$1 # use nameref for indirection
+    local value="$2"
+    local key="$3"
+    local mode="$4"
+
+    [[ "$key" && "$mode" == "map" ]] && arr+=(["$key"]="$value") || arr+=("$value")
+}
+
+function get_print_color() {
+    local mode="$1"
+    local push_mode=$([[ "$mode" == "merge" ]] && echo "map" || echo "array")
+
     shift
 
     local style=""
@@ -49,16 +97,16 @@ print_color() {
     local styles_bg_256=()
     local styles_16=()
 
-    if [ "$2" == "info" ]; then
+    if [ "$1" == "info" ]; then
         [[ $is_256 ]] && styles_fg_256+=("$sea_green1_256") || styles_16+=("$turquoise_16")
         shift
-    elif [ "$2" == "success" ]; then
+    elif [ "$1" == "success" ]; then
         [[ $is_256 ]] && styles_fg_256+=("$spring_green2_256") || styles_16+=("$light_green_16")
         shift
-    elif [ "$2" == "warning" ]; then
+    elif [ "$1" == "warning" ]; then
         [[ $is_256 ]] && styles_fg_256+=("$yellow3_256") || styles_16+=("$yellow_16")
         shift
-    elif [ "$2" == "danger" ]; then
+    elif [ "$1" == "danger" ]; then
         [[ $is_256 ]] && styles_fg_256+=("$red1_256") || styles_16+=("$light_red_16")
         shift
     fi
@@ -68,57 +116,109 @@ print_color() {
         suffix=$([[ $is_256 ]] && echo "_256" || echo "_16")
 
         for var in "$@"; do
-            eval s='$'"${var}${suffix}"
-            if [[ $s ]]; then
-                if [[ $is_256 ]]; then
-                    [[ $var == *_bg ]] && styles_bg_256+=("$s") || styles_fg_256+=("$s")
+            local code=$(get_color_code_details $var)
+            IFS=':' read -r -a color_code <<<"$code"
+
+            local color="${color_code[2]}"
+
+            if [[ ${color_code[0]} == "16" ]]; then
+                styles_16+=("$color")
+            else
+                if [[ ${color_code[1]} == "fg" ]]; then
+                    styles_fg_256+=("$color")
                 else
-                    styles_16+=("$s")
+                    styles_bg_256+=("$color")
                 fi
             fi
-
-            # let's try _16 if we are in 256 mode
-            if [[ ! $s && "$is_256" ]]; then
-                eval s='$'"${var}_16"
-                [[ $s ]] && styles_16+=("$s")
-            fi
-
-            # style=$([[ $style && $s ]] && echo "${style};${s}" || echo "$s") # if "s" is set => ;$s else null
         done
     fi
 
-    # style=${style:-$default_colour} # if $style is empty, use default value
-    local style="\e["
+    if [[ "$mode" == "merge" ]]; then
+        local style=""
 
-    if [[ ! $(is_array_empty "${styles_16[@]}") ]]; then
-        merge=$(merge_styles "${styles_16[@]}")
-        style="${style}${merge}"
+        if [[ ! $(is_array_empty "${styles_16[@]}") ]]; then
+            style=$(merge_styles "${style}" "${styles_16[@]}")
+        fi
+
+        if [[ ! $(is_array_empty "${styles_fg_256[@]}") ]]; then
+            style=$(merge_styles "${style}" "38;5" "${styles_fg_256[@]}")
+        fi
+
+        if [[ ! $(is_array_empty "${styles_bg_256[@]}") ]]; then
+            style=$(merge_styles "${style}" "48;5" "${styles_bg_256[@]}")
+        fi
+
+        if [[ $style ]]; then
+            # echo "$(color "$style")m%b${end_color}" | \cat -v
+            echo "\e[${style}m:${end_color}"
+            # printf "\e[${style}m%b${end_color}" "${text}"
+        fi
+
+    else
+        local style=""
     fi
+}
 
-    if [[ ! $(is_array_empty "${styles_fg_256[@]}") ]]; then
-        merge=$(merge_styles "${styles_fg_256[@]}")
-        style="${style}38;5;${merge}"
-    fi
+print_color() {
+    local text=$1
+    shift
 
-    if [[ ! $(is_array_empty "${styles_bg_256[@]}") ]]; then
-        merge=$(merge_styles "${styles_bg_256[@]}")
-        style="${style}48;5;${merge}"
-    fi
+    local c=$(get_print_color "$@")
+    IFS=':' read -r -a print_color <<<"$c"
 
-    if [[ $style ]]; then
+    start=${print_color[0]}
+    end=${print_color[1]}
+
+    if [[ $start ]]; then
         # echo "$(color "$style")m%b${end_color}" | \cat -v
-        printf "${style}m%b${end_color}" "${text}"
+        printf "${start}%b${end}" "${text}"
     else
         echo "$text"
     fi
 }
 
-get_color() {
-    eval style='$'"${1}" 2>/dev/null
+get_color_code() {
+    # 2>/dev/null
 
-    if [ "$style" ]; then
+    local code=$(get_color_code_details "$1")
+    IFS=':' read -r -a color_code <<<"$code"
+
+    local color=${color_code[2]}
+
+    if [ "$color" ]; then
         # return start color code / end color code separated with a column ":" to be parsable easily
-        echo "$(color "$style" | \cat -v)m:$($end_color | \cat -v)"
+        # echo "$(color "$style" | \cat -v)m:$($end_color | \cat -v)"
+        echo "$color"
+    fi
+}
+
+get_print_color_code() {
+    # 2>/dev/null
+
+    local code=$(get_color_code_details "$1")
+    IFS=':' read -r -a color_code <<<"$code"
+
+    local color=${color_code[2]}
+    local type=${color_code[0]}
+
+    if [ "$color" ]; then
+        # return start color code / end color code separated with a column ":" to be parsable easily
+        # echo "$(color "$style" | \cat -v)m:$($end_color | \cat -v)"
+
+        # only mode 256 have type=fg|bg
+        if [[ ! "$type" ]]; then
+            style=$(merge_styles "${style}" "${styles_16[@]}")
+        fi
+
+        if [[ "$type" == "fg" ]]; then
+            style=$(merge_styles "${style}" "38;5" "${styles_fg_256[@]}")
+        else
+            1
+        fi
+
+        if [[ ! $(is_array_empty "${styles_bg_256[@]}") ]]; then
+            style=$(merge_styles "${style}" "48;5" "${styles_bg_256[@]}")
+        fi
     fi
 }
 
@@ -449,13 +549,44 @@ EOS
     fi
 }
 
+function help_command() {
+    print_color "$1" underlined
+}
+
+function help_option() {
+    print_color "$1" italic
+}
+
+function help_yellow() {
+    print_color "$1" yellow
+}
+
 function help() {
+    program=$(help_yellow "$script_name")
+    example=$(print_color "Example:" purple-magenta)
+
     \cat <<-EOS
   HELP:
     
-  ፨  printf with colors     🠒   $0 print <text> <...colors>
-  ፨  show all color names   🠒   $0 colors-names
-  ፨  get a color code       🠒   $0 color <color>
+  👉  printf with colors     🠒   $program $(help_command print) <$(help_option text)> <...$(help_option colors)>  
+      ✍   $example $program print "some text" red pink_bg bold underlined
+
+  👉  show all color names   🠒   $program $(help_command colors-names)
+
+  👉  get a color code       🠒   $program $(help_command color) <$(help_option color)>
+      ✍   $example $program color pink_bg
+
+
+
+  😇😇 $(print_color "        Little Tip        " grey white-bg bold) 😇😇
+
+  Every color can use $(help_yellow -), $(help_yellow .) or $(help_yellow _) as a separator between words:
+
+      ✍   $example $program print purple-magenta-bg
+      ✍   $example $program print purple.magenta.bg
+      ✍   $example $program print purple_magenta_bg
+
+  Add the suffix $(help_yellow bg) to use a color as the background
   
 EOS
 }
@@ -467,12 +598,12 @@ if (($# > 0)); then
         command="print_color"
         ;;
 
-    "colors-names")
+    "color-names")
         command="get_color_names"
         ;;
 
-    "color")
-        command="get_color"
+    "color-code")
+        command="get_color-code"
         ;;
 
     "help")
@@ -481,7 +612,13 @@ if (($# > 0)); then
         ;;
 
     *)
-        printf "Please, enter a supported command\n\n"
+        printf "\n  "
+        print_color "       Error        " white red-bg
+        print_color "  🠒  $1" bold
+        print_color " is not a command supported" red
+
+        printf "\n\n"
+
         help
         exit 1
         ;;

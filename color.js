@@ -24,7 +24,7 @@ const terminalWidth = process.stdout.columns || 80;
  * @param {{[K:string|number]: any}} o
  * @returns {Array<{key:string; value:number}>}
  */
-const objectToKeyValueArray = o => Object.entries(o).map(([ key, value ]) => ({ key, value }));
+// const objectToKeyValueArray = o => Object.entries(o).map(([ key, value ]) => ({ key, value }));
 
 /**
  *
@@ -103,9 +103,9 @@ const contrastBg = (colorKey, mode) => {
 const getColorsAndStyles = mode => {
     if (mode === 16) {
         return {
-            foreground: objectToKeyValueArray(colors[ 16 ].foreground),
-            background: objectToKeyValueArray(colors[ 16 ].background),
-            styles: objectToKeyValueArray(colors[ 16 ].style)
+            foreground: objectToKeyValueArrayRecursive(colors[ 16 ].foreground),
+            background: objectToKeyValueArrayRecursive(colors[ 16 ].background),
+            styles: objectToKeyValueArrayRecursive(colors[ 16 ].style)
         };
     }
 
@@ -148,7 +148,7 @@ const displayColors = (mode, text, options) => {
 
 
     const getStyles = () => {
-        const styles = objectToKeyValueArray(colors[ 16 ].style);
+        const styles = objectToKeyValueArrayRecursive(colors[ 16 ].style);
 
         const stylesSelected = styles.filter(s => {
             return opts.allStyles ||
@@ -181,8 +181,8 @@ const displayColors = (mode, text, options) => {
 
         if (mode === 16)
             return {
-                foregroundColors: objectToKeyValueArray(colors[ 16 ].foreground).filter(filterFg),
-                backgroundColors: objectToKeyValueArray(colors[ 16 ].background).filter(filterBg),
+                foregroundColors: objectToKeyValueArrayRecursive(colors[ 16 ].foreground).filter(filterFg),
+                backgroundColors: objectToKeyValueArrayRecursive(colors[ 16 ].background).filter(filterBg),
             };
 
         console.assert(mode === 256, 'mode is 16 | 256');

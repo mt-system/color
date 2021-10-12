@@ -9,10 +9,25 @@ const colors = {
         style: {
             defaultColour: 0,
             bold: 1,
+            dim: 2,
+            italic: 3,
             underlined: 4,
-            flashingText: 5,
-            reverseField: 7,
-            concealed: 8
+            blink: 5,
+            overline: 6,
+            reverse: 7,
+            invisible: 8,
+            strikethrough: 9,
+            reset: {
+                all: 0,
+                bold: 21,
+                dim: 22,
+                italic: 23,
+                underlined: 24,
+                blink: 25,
+                reverse: 27,
+                invisible: 28,
+                strikethrough: 29
+            }
         },
 
         background: {

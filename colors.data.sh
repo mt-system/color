@@ -44,12 +44,25 @@ export white_bg_16=107
 
 # style
 
-export colour_16=0
+export default_colour_16=0
 export bold_16=1
+export dim_16=2
+export italic_16=3
 export underlined_16=4
-export flashing_text_16=5 # disabled_on some_terminals
-export reverse_field_16=7 # exchange_foreground and_background color
-export concealed_16=8     # invisible
+export blink_16=5 # disabled_on some_terminals
+export overline_16=6
+export reverse_16=7 # exchange_foreground and_background color
+export invisible_16=8
+export strikethrough_16=9
+export reset_all_16=0
+export reset_bold_16=21
+export reset_dim_16=22
+export reset_italic_16=23
+export reset_underlined_16=24
+export reset_blink_16=25
+export reset_reverse_16=27
+export reset_invisible_16=28
+export reset_strikethrough_16=29
 
 #####################################################################################
 #####################################################################################
