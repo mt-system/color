@@ -75,10 +75,10 @@ const lightGrey = colors[ 256 ].grey.light[ 4 ];
 
 /**
  *  @param {string} colorKey
- *  @param {16 | 25} type
+ *  @param {16 | 25} mode
  */
-const contrastBg = (colorKey, type) => {
-    const greyBackground = `;${markers[ type ].bg};${lightGrey}`;
+const contrastBg = (colorKey, mode) => {
+    const greyBackground = `;${markers[ mode ].bg};${lightGrey}`;
 
     if (colorKey === 'black')
         return greyBackground;
@@ -98,10 +98,10 @@ const contrastBg = (colorKey, type) => {
 
 
 /**
- *  @param {16 | 25} type
+ *  @param {16 | 25} mode
  */
-const getColorsAndStyles = type => {
-    if (type === 16) {
+const getColorsAndStyles = mode => {
+    if (mode === 16) {
         return {
             foreground: objectToKeyValueArray(colors[ 16 ].foreground),
             background: objectToKeyValueArray(colors[ 16 ].background),
@@ -109,8 +109,8 @@ const getColorsAndStyles = type => {
         };
     }
 
-    console.assert(type === 256, 'type is 16 | 256');
-    // throw new Error(`type must be 16 | 256. Here type: "${type}"`);
+    console.assert(mode === 256, 'mode is 16 | 256');
+    // throw new Error(`mode must be 16 | 256. Here mode: "${mode}"`);
 
     return {
         colors: objectToKeyValueArrayRecursive(colors[ 256 ])
@@ -120,7 +120,7 @@ const getColorsAndStyles = type => {
 
 
 /**
- *  @param {16 | 25} type
+ *  @param {16 | 25} mode
  *  @param {string} text
  *  @param {{
  *      allStyles?: boolean;
@@ -130,21 +130,17 @@ const getColorsAndStyles = type => {
  *      background?: string[];
  *      onlyForeground?: boolean;
  *      onlyBackground?: boolean;
- *      raw?: boolean;
+ *      raw?: boolean | 'json' | 'sh';
  *  }} options
  */
-const displayColors = (type, text, options) => {
+const displayColors = (mode, text, options) => {
 
     const opts = { allStyles: true, styles: [], mergeStyles: false, raw: false, ...options };
 
 
     if (opts.raw) {
-        for (const [ key, styles ] of Object.entries(getColorsAndStyles(type))) {
-            console.log(`# ${key}`);
-
-            for (const s of styles) {
-                console.log(`${s.key}: ${s.value}`);
-            }
+        for (const [ key, styles ] of Object.entries(getColorsAndStyles(mode))) {
+            displayRaw(key, styles, { mode, type: opts.raw === true ? 'sh' : opts.raw });
         }
 
         return;
@@ -183,14 +179,14 @@ const displayColors = (type, text, options) => {
         const filterFg = opts.onlyBackground ? filterAll : opts.foreground ? c => hasColor(opts.foreground, c) : filterAll;
         const filterBg = opts.onlyForeground ? filterAll : opts.background ? c => hasColor(opts.background, c) : filterAll;
 
-        if (type === 16)
+        if (mode === 16)
             return {
                 foregroundColors: objectToKeyValueArray(colors[ 16 ].foreground).filter(filterFg),
                 backgroundColors: objectToKeyValueArray(colors[ 16 ].background).filter(filterBg),
             };
 
-        console.assert(type === 256, 'type is 16 | 256');
-        // throw new Error(`type must be 16 | 256. Here type: "${type}"`);
+        console.assert(mode === 256, 'mode is 16 | 256');
+        // throw new Error(`mode must be 16 | 256. Here mode: "${mode}"`);
 
         const colors256 = objectToKeyValueArrayRecursive(colors[ 256 ]);
 
@@ -214,9 +210,9 @@ const displayColors = (type, text, options) => {
 
             for (const s of styles) {
                 const data = {
-                    color: stylize({ style: `${s.value};${markers[ type ].fg};${fg.value};${markers[ type ].bg};${bg.value}`, text: `  ${text}  ` }),
-                    fg: stylize({ style: `${markers[ type ].fg};${fg.value}${contrastBg(fg.key, type)}`, text: `${fg.key}` }),
-                    bg: stylize({ style: `${markers[ type ].fg};${bg.value}${contrastBg(bg.key, type)}`, text: `${bg.key}` }),
+                    color: stylize({ style: `${s.value};${markers[ mode ].fg};${fg.value};${markers[ mode ].bg};${bg.value}`, text: `  ${text}  ` }),
+                    fg: stylize({ style: `${markers[ mode ].fg};${fg.value}${contrastBg(fg.key, mode)}`, text: `${fg.key}` }),
+                    bg: stylize({ style: `${markers[ mode ].fg};${bg.value}${contrastBg(bg.key, mode)}`, text: `${bg.key}` }),
                     style: styles.length === 1 && s.key === 'defaultColour' ? '' : s.key
                 };
 
@@ -234,27 +230,68 @@ const displayColors = (type, text, options) => {
 };
 
 
+/**
+ *  @param {string} str
+ *  @returns string
+ */
+const camelToSnakeCase = str => str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+/**
+ *  @param {string} str
+ *  @returns string
+ */
+const dotToSnakeCase = str => str.replace(/\./g, '_');
+
+/**
+ *  @param {string} str
+ *  @returns string
+ */
+const toShellVariable = str => dotToSnakeCase(camelToSnakeCase(str));
+
+/**
+ *  @param {string} key
+ *  @param {{key:string; value:number}[]} styles
+ *  @param {{
+ *      mode: 16 | 256;
+ *      type: 'json' | 'sh';
+ *      onlyKey?: boolean
+ *  }} options
+ */
+const displayRaw = (key, styles, options) => {
+    const { type, mode, onlyKey = false } = options;
+
+    for (const s of styles) {
+        if (type === 'sh')
+            console.log(`${toShellVariable(s.key)}${key === 'background' ? '_bg' : ''}_${mode}${onlyKey ? '' : `=${s.value}`}`);
+        else {
+            console.assert(type === 'json');
+            console.log(`${key}.${s.key}.${mode}${onlyKey ? '' : ` = ${s.value}`}`);
+        }
+    }
+};
 
 
 /**
- *  @param {16 | 25} type
+ *  @param {16 | 25} mode
+ *  @param {{
+ *      raw?: boolean | 'json' | 'sh'
+ *  }} options
  */
-const displayColorKeys = (type, { raw = false }) => {
+const displayColorKeys = (mode, options) => {
 
-    Object.entries(getColorsAndStyles(type)).forEach(([ key, styles ], i) => {
+    const { raw = false } = options;
+
+    Object.entries(getColorsAndStyles(mode)).forEach(([ key, styles ], i) => {
         if (raw) {
-            console.log(`# ${key}`);
 
-            for (const style of styles) {
-                console.log(style.key);
-            }
+            displayRaw(key, styles, { mode, type: raw === true ? 'sh' : raw, onlyKey: true });
 
         } else {
             let maxKeyLength = 0;
 
             const rows = styles.map(s => {
                 maxKeyLength = Math.max(maxKeyLength, s.key.length);
-                return raw ? s.key : stylize({ style: `${markers[ type ].fg};${s.value}${contrastBg(s.key, type)}`, text: `${s.key}` });
+                return raw ? s.key : stylize({ style: `${markers[ mode ].fg};${s.value}${contrastBg(s.key, mode)}`, text: `${s.key}` });
             });
 
             const boldUnderline = `${colors[ 16 ].style.bold};${colors[ 16 ].style.underlined}`;

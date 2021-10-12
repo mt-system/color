@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { Command, Argument, InvalidArgumentError } = require('commander');
+const { Command, Argument, Option, InvalidArgumentError } = require('commander');
 const { displayColors, displayColorKeys } = require('./color');
 
 const program = new Command();
@@ -33,7 +33,7 @@ const parsers = (...handlers) => (value, previous) => handlers.reduce((last, han
 
 program.command('display-styles')
     .addArgument(new Argument('[type]', 'terminal color type').argParser(parsers(parseInt, choices(16, 256))))
-    .option('-r, --raw', 'output raw data without styling')
+    .addOption(new Option('-r, --raw [output-type]', 'output raw data without styling').choices([ 'sh', 'json' ]))
     .description('display terminal styles')
     .action((type, { raw }) => {
         if (!type || type === 16) {
@@ -68,7 +68,7 @@ program.command('display-styles')
 
 program.command('display-keys')
     .addArgument(new Argument('[type]', 'terminal color type').argParser(parsers(parseInt, choices(16, 256))))
-    .option('-r, --raw', 'output raw data without styling')
+    .addOption(new Option('-r, --raw [output-type]', 'output raw data without styling').choices([ 'sh', 'json' ]))
     .description('display terminal style keys')
     .action((type, { raw }) => {
 
