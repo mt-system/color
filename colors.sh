@@ -2,7 +2,7 @@
 
 # shellcheck source=./colors.data.sh
 function script_path() {
-    realpath -s "$0"
+    realpath "$0"
 }
 
 function add_colors_variables() {
@@ -574,7 +574,7 @@ function help() {
     local script=$(script_path)
     local script_name=$(basename "$script")
 
-    program=$(yellow "$script_name")
+    program=$(yellow "${script_name%.*}")
     example=$(print_color "Example:" purple-magenta)
 
     \cat <<-EOS
