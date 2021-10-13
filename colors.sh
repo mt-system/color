@@ -188,7 +188,7 @@ function get_print_color() {
     fi
 }
 
-print_color() {
+function print_color() {
     local text=$1
     shift
 
@@ -202,11 +202,16 @@ print_color() {
         # echo "$(color "$style")m%b${end_color}" | \cat -v
         printf "${start}%b${end}" "${text}"
     else
-        echo "$text"
+        printf %s "$text"
     fi
 }
 
-get_color_code() {
+function print_color_newline() {
+    print_color "$@"
+    echo
+}
+
+function get_color_code() {
     # 2>/dev/null
 
     local code=$(get_print_color details "$@")
@@ -575,12 +580,18 @@ function help() {
     \cat <<-EOS
   HELP:
     
-  👉  printf with colors     🠒   $program $(underline print) <$(option text)> <...$(option colors)>  
+  👉  $program $(underline print) <$(option text)> <...$(option colors)>
+      🠒   printf with colors
       ✍   $example $program print "some text" red pink_bg bold underlined
 
-  👉  show all color names   🠒   $program $(underline colors-names)
+  👉  $program $(underline printn) ...
+      🠒  same as $(underline print) but with extra appended \n at the end
 
-  👉  get a color code       🠒   $program $(underline color) <$(option color)>
+  👉  $program $(underline colors-names)
+      🠒   show all color names
+
+  👉  get a color code
+      🠒   $program $(underline color) <$(option color)>
       ✍   $example $program color pink_bg
 
 
@@ -603,6 +614,10 @@ if (($# > 0)); then
 
     "print")
         command="print_color"
+        ;;
+
+    "printn")
+        command="print_color_newline"
         ;;
 
     "color-names")
