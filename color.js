@@ -4,8 +4,29 @@ const fixedWidthString = require('fixed-width-string');
 const stringWidth = require('string-width');
 const { colors } = require('./colors.data');
 
+
+
+/*
+Name	decimal	octal	hex	    C-escape	Ctrl-Key	Description
+ESC	    27  	033 	0x1B	\e	        ^[	        Escape character
+
+Note: Some control escape sequences, like \e for ESC, are not guaranteed to work in all languages and compilers.
+It is recommended to use the decimal, octal or hex representation as escape code.
+
+Ctrl-Key: ^[
+Octal: \033
+Unicode: \u001b
+Hexadecimal: \x1b
+Decimal: 27
+
+Followed by the command
+Somtimes delimited by opening square bracket ([), known as a Control Sequence Introducer (CSI),
+optionally followed by arguments and the command itself.
+
+*/
+
 const markers = {
-    escape: '\x1b', // in shell it is \e[
+    escape: '\x1b', // in shell it is \e
     16: {
         fg: '',
         bg: ''
@@ -15,6 +36,15 @@ const markers = {
         bg: '48;5'
     }
 };
+
+
+/**
+ *
+ * @param {string[]} styleFields
+ * @param {string} sep
+ * @returns {string}
+ */
+const $ = (styleFields, sep = ';') => styleFields.filter(v => !!v).join(sep);
 
 const terminalWidth = process.stdout.columns || 80;
 
@@ -72,13 +102,14 @@ const displayColumns = (rows, rowMaxLength) => {
 
 
 const lightGrey = colors[ 256 ].grey.light[ 4 ];
+const { darkGrey } = colors[ 16 ].background;
 
 /**
  *  @param {string} colorKey
  *  @param {16 | 25} mode
  */
 const contrastBg = (colorKey, mode) => {
-    const greyBackground = `;${markers[ mode ].bg};${lightGrey}`;
+    const greyBackground = $([ markers[ mode ].bg, mode === 16 ? darkGrey : lightGrey ]);
 
     if (colorKey === 'black')
         return greyBackground;
@@ -158,9 +189,9 @@ const displayColors = (mode, text, options) => {
 
 
         if (opts.mergeStyles) {
-            const mergeStyles = stylesSelected.reduce((m, style, i) => ({
-                key: `${m.key}${i === 0 ? '' : '.'}${style.key}`,
-                value: `${m.value}${i === 0 ? '' : ';'}${style.value}`
+            const mergeStyles = stylesSelected.reduce((m, style) => ({
+                key: $([ m.key, style.key ], '.'),
+                value: $([ m.value, style.value ])
             }), { key: '', value: '' });
 
             return [ mergeStyles ];
@@ -210,9 +241,9 @@ const displayColors = (mode, text, options) => {
 
             for (const s of styles) {
                 const data = {
-                    color: stylize({ style: `${s.value};${markers[ mode ].fg};${fg.value};${markers[ mode ].bg};${bg.value}`, text: `  ${text}  ` }),
-                    fg: stylize({ style: `${markers[ mode ].fg};${fg.value}${contrastBg(fg.key, mode)}`, text: `${fg.key}` }),
-                    bg: stylize({ style: `${markers[ mode ].fg};${bg.value}${contrastBg(bg.key, mode)}`, text: `${bg.key}` }),
+                    color: stylize({ style: $([ s.value, markers[ mode ].fg, fg.value, markers[ mode ].bg, bg.value ]), text: `  ${text}  ` }),
+                    fg: stylize({ style: $([ markers[ mode ].fg, fg.value, contrastBg(fg.key, mode) ]), text: `${fg.key}` }),
+                    bg: stylize({ style: $([ markers[ mode ].fg, mode === 16 ? bg.value - 10 : bg.value, contrastBg(bg.key, mode) ]), text: `${bg.key}` }),
                     style: styles.length === 1 && s.key === 'defaultColour' ? '' : s.key
                 };
 
@@ -291,10 +322,10 @@ const displayColorKeys = (mode, options) => {
 
             const rows = styles.map(s => {
                 maxKeyLength = Math.max(maxKeyLength, s.key.length);
-                return raw ? s.key : stylize({ style: `${markers[ mode ].fg};${s.value}${contrastBg(s.key, mode)}`, text: `${s.key}` });
+                return raw ? s.key : stylize({ style: $([ markers[ mode ].fg, s.value, contrastBg(s.key, mode) ]), text: s.key });
             });
 
-            const boldUnderline = `${colors[ 16 ].style.bold};${colors[ 16 ].style.underlined}`;
+            const boldUnderline = $([ colors[ 16 ].style.bold, colors[ 16 ].style.underlined ]);
             console.log(`${i > 0 ? '\n' : ''}${stylize({ style: boldUnderline, text: key })}:\n`);
 
             displayColumns(rows, maxKeyLength);

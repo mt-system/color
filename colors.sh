@@ -587,13 +587,12 @@ function help() {
   👉  $program $(underline printn) ...
       🠒  same as $(underline print) but with extra appended \n at the end
 
-  👉  $program $(underline colors-names)
+  👉  $program $(underline names)
       🠒   show all color names
 
-  👉  get a color code
-      🠒   $program $(underline color) <$(option color)>
-      ✍   $example $program color pink_bg
-
+  👉  $program $(underline get) <$(option color)>
+      🠒   get a color code
+      ✍   $example $program get pink_bg
 
 
   😇😇 $(print_color "        Little Tip        " grey white-bg bold) 😇😇
@@ -620,12 +619,16 @@ if (($# > 0)); then
         command="print_color_newline"
         ;;
 
-    "color-names")
+    "names")
         command="get_color_names"
         ;;
 
-    "color")
+    "get")
         command="get_color_code"
+        ;;
+
+    "source-colors")
+        command="source_colors"
         ;;
 
     "help")
