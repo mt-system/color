@@ -581,17 +581,17 @@ function help() {
   HELP:
     
   👉  $program $(underline print) <$(option text)> <...$(option colors)>
-      🠒   printf with colors
+           printf with colors
       ✍   $example $program print "some text" red pink_bg bold underlined
 
   👉  $program $(underline printn) ...
-      🠒  same as $(underline print) but with extra appended \n at the end
+          same as $(underline print) but with extra appended \n at the end
 
   👉  $program $(underline names)
-      🠒   show all color names
+           show all color names
 
   👉  $program $(underline get) <$(option color)>
-      🠒   get a color code
+           get a color code
       ✍   $example $program get pink_bg
 
 
@@ -608,48 +608,52 @@ function help() {
 EOS
 }
 
-if (($# > 0)); then
-    case $1 in
+case $1 in
 
-    "print")
-        command="print_color"
-        ;;
+"print")
+    command="print_color"
+    ;;
 
-    "printn")
-        command="print_color_newline"
-        ;;
+"printn")
+    command="print_color_newline"
+    ;;
 
-    "names")
-        command="get_color_names"
-        ;;
+"names")
+    command="get_color_names"
+    ;;
 
-    "get")
-        command="get_color_code"
-        ;;
+"get")
+    command="get_color_code"
+    ;;
 
-    "source-colors")
-        command="source_colors"
-        ;;
+"source-colors")
+    command="source_colors"
+    ;;
 
-    "help")
-        help
-        exit 1
-        ;;
+"help")
+    help
+    exit 1
+    ;;
 
-    *)
-        printf "\n  "
-        print_color "       Error        " white red-bg
-        print_color "  🠒  $1" bold
+*)
+    printf "\n  "
+    print_color "       Error        " white red-bg
+    if [[ -e "$1" ]]; then
+        print_color "      $1" bold
         print_color " is not a supported command" red
+    else
+        print_color " you must specify a 'command'" red
+    fi
 
-        printf "\n\n"
+    printf "\n\n"
 
-        help
-        exit 1
-        ;;
-    esac
+    help
+    exit 1
+    ;;
+esac
 
-    shift
+shift
 
+if (($# > 0)); then
     $command "$@"
 fi
