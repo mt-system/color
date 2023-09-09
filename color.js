@@ -4,8 +4,6 @@ const fixedWidthString = require('fixed-width-string');
 const stringWidth = require('string-width');
 const { colors } = require('./colors.data');
 
-
-
 /*
 Name	decimal	octal	hex	    C-escape	Ctrl-Key	Description
 ESC	    27  	033 	0x1B	\e	        ^[	        Escape character
